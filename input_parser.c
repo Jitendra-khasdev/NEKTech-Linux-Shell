@@ -39,18 +39,18 @@
  * folder.
  * Developer: Jitendra Khasdev
  */
-
- 
-
+int nektech_etc_passwd_search();
 int nektech_search_path(char *,int);
 
 char *nk_temp_arg[1];
+int redirection = 0, append = 0; 
+char *redirt_file = NULL;
 
-main() 
+int main() 
 { 
    char cmd[MAX_LEN]; 
    char *cmd_arg[MAX_ARG]; 
-   int cmdlen,i,j,tag; 
+   int cmdlen,i,j,tag, pending_exec = 0, error = 0;
 
    do{
       /* init cmd */
@@ -62,6 +62,9 @@ main()
       cmdlen=strlen(cmd);
       cmdlen--;
       cmd[cmdlen]='\0';
+      redirt_file = NULL;
+      redirection = 0;
+      append = 0;
 
       for(i=0;i<MAX_ARG;i++) cmd_arg[i]=NULL;
       i=0; j=0; tag=0;
@@ -93,20 +96,46 @@ main()
          nektech_change_dir(cmd_arg);
          continue;
       }
+      /* Handling Redirection out output to a file.*/
+      i = 0;
+      while (cmd_arg [i]){
+         if(strcmp(cmd_arg[i],">")==0 || strcmp(cmd_arg[i],">>")==0){
+            if (cmd_arg[i+1] != NULL){
+               redirt_file = cmd_arg[i+1];
+               if (strcmp(cmd_arg[i],">>")==0)
+                  append = 1;
+               while (cmd_arg[i] != NULL){
+                  cmd_arg[i++] = cmd_arg[i+2];
+               }
+               redirection = 1;
+               break;
+            }
+            else{
+               error = 1;
+               break;
+            }
+         }
+         i++;
+      }
+      if (error){
+         printf ("SHELL PARSING ERROR. WRONG INPUT.\n");
+         continue;
+      }
       /* other cmd for fork/exec*/
       nektech_run_cmd(cmd_arg);
    }while(1); 
 }
 
-/* cd - Change Directory
- * Shell internal Command to chanfe the present working Directory.
- * It calls chdir(). Error conditions: EACCESS, EPERM, ENOENT.
- * Developer: Shubhangi Maheshwari
+/* Function name	: nektech_change_dir () 
+ * Description		: Changes Directory of the shell process to the directory
+ *			  given as user input.cd is Shell internal Command to 
+ *			  change the present working Directory.It calls chdir(). 
+ * Error conditions	: EACCESS, EPERM, ENOENT, ENOTDIR
+ * Developer		: Shubhangi Maheshwari
+ * 			  Jitendra Khasdev (cd command with home directoty intelligence)
 */ 
-
 int nektech_change_dir(char *argv[]) 
 { 
-
 
    if(argv[1]!=NULL){
       
@@ -133,12 +162,15 @@ int nektech_change_dir(char *argv[])
          }
    } 
    else{
-        nektech_etc_passwd_search();
+        if (nektech_etc_passwd_search()){
+		printf("Missing system file./n");
+		return -1;
+	}
         nektech_change_dir(nk_temp_arg);    
    }
 
-return 1;    
-}     
+   return 1;    
+}
 
 /*
  *NEKTech Research Labs
@@ -159,13 +191,14 @@ return 1;
 int nektech_etc_passwd_search()
 {
 
-int fp,c,i=0,k,j;
+int fp, c, i=0, k, j, ret = 0;
 static char buffer[200],temp[200];
 int end_file_position, current_position=1,flag=0,repeat=0,count=0;
  
      fp = open("/etc/passwd",O_RDONLY);
      if( fp == -1 ){
        printf("\n Unable to reach /dir with error [%s]\n",strerror(errno));
+       ret = -1;
      }
      else{
         end_file_position=lseek(fp,0L,2);  //reach the end of the file
@@ -189,7 +222,7 @@ int end_file_position, current_position=1,flag=0,repeat=0,count=0;
         i=i+count;
         }
      } 
-return 0;
+     return ret;
 }
 
 /*
